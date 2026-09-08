@@ -1,0 +1,16 @@
+export { default as Navbar } from './components/Navbar';
+export { default as HeroFilter } from './components/HeroFilter';
+export { default as PropertyCard } from './components/PropertyCard';
+export { default as PropertyDetail } from './components/PropertyDetail';
+export { default as LeadCaptureModal } from './components/LeadCaptureModal';
+export { default as ShareModal } from './components/ShareModal';
+export { default as Footer } from './components/Footer';
+export { default as Home } from './components/Home';
+export { default as LoginModal } from './components/LoginModal';
+export { default as DashboardAdmin } from './components/DashboardAdmin';
+export { default as DashboardVendedor } from './components/DashboardVendedor';
+export { default as FavoritesDrawer } from './components/FavoritesDrawer';
+export { default as ContactSection } from './components/ContactSection';
+export { default as PropertyFormModal } from './components/PropertyFormModal';
+export { default as Logo } from './components/Logo';
+export { mockProperties, mockCities, mockTypes } from './data/mockProperties';

@@ -1,0 +1,56 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@source '../views';
+@source '../../src/**/*.{js,jsx,ts,tsx}';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --font-sans:
+        'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+}
+
+:root {
+    --background: #050505;
+    --foreground: #F8FAFC;
+    --card: #141416;
+    --card-foreground: #F8FAFC;
+}
+
+body {
+    background-color: #050505;
+    color: #F8FAFC;
+    font-family: var(--font-sans);
+}
+
+/* Clases de Oro Metálico Brillante Unificado */
+.btn-gold-luxury {
+    background: linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%) !important;
+    color: #000000 !important;
+    font-weight: 800 !important;
+    transition: all 0.25s ease-in-out;
+}
+.btn-gold-luxury:hover {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 25px -5px rgba(212, 175, 55, 0.3);
+}
+.btn-gold-luxury:active {
+    filter: brightness(0.95);
+    transform: translateY(0);
+}
+
+.text-gold-gradient {
+    background: linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #F3E8CB 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
