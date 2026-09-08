@@ -30,8 +30,8 @@ WORKDIR /var/www/html
 # Copy project files
 COPY . /var/www/html
 
-# Create default .env from .env.example
-RUN cp .env.example .env
+# Create default .env from .env.example or create minimal one
+RUN if [ -f .env.example ]; then cp .env.example .env; else touch .env; fi
 
 # Install Composer PHP dependencies
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
