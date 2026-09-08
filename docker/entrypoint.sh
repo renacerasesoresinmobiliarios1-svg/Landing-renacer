@@ -4,32 +4,32 @@ set -e
 # Default PORT to 10000 if not set (Render default)
 export PORT=${PORT:-10000}
 
+# Configure PHP-FPM to preserve environment variables for workers
+if [ -f /usr/local/etc/php-fpm.d/www.conf ]; then
+    sed -i 's/^;*clear_env = .*/clear_env = no/' /usr/local/etc/php-fpm.d/www.conf
+    sed -i 's/^;*catch_workers_output = .*/catch_workers_output = yes/' /usr/local/etc/php-fpm.d/www.conf
+fi
+
 # Create destination directory for nginx config if not present
 mkdir -p /etc/nginx/http.d
 
 # Substitute PORT variable into nginx config
 envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/http.d/default.conf
 
-# SQLite fallback and permissions
+# Ensure database directory and SQLite file exist
+mkdir -p /var/www/html/database
 if [ "$DB_CONNECTION" = "sqlite" ] || [ -z "$DB_CONNECTION" ]; then
-    mkdir -p /var/www/html/database
     if [ ! -f /var/www/html/database/database.sqlite ]; then
         touch /var/www/html/database/database.sqlite
     fi
-    chmod -R 777 /var/www/html/database
-    chmod 666 /var/www/html/database/database.sqlite 2>/dev/null || true
-    chown -R www-data:www-data /var/www/html/database 2>/dev/null || true
 fi
 
-# Ensure storage and bootstrap/cache directories and permissions
+# Ensure storage and bootstrap/cache directories exist
 mkdir -p /var/www/html/storage/framework/cache/data
 mkdir -p /var/www/html/storage/framework/sessions
 mkdir -p /var/www/html/storage/framework/views
 mkdir -p /var/www/html/storage/logs
 mkdir -p /var/www/html/bootstrap/cache
-
-chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache
-chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
 
 # Generate APP_KEY if missing
 if [ -z "$APP_KEY" ]; then
@@ -51,6 +51,11 @@ php artisan db:seed --force || echo "Warning: Seeder could not run immediately."
 php artisan config:clear || true
 php artisan route:clear || true
 php artisan view:clear || true
+
+# Final ownership and permissions for www-data on storage, cache and database
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
+chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
+chmod 666 /var/www/html/database/database.sqlite 2>/dev/null || true
 
 # Start PHP-FPM in background
 echo "Starting PHP-FPM..."
