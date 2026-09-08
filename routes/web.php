@@ -9,6 +9,20 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\LeadController;
 
+// Health & Diagnostic endpoint
+Route::get('/debug-test', function () {
+    return response()->json([
+        'status' => 'ok',
+        'php_version' => PHP_VERSION,
+        'app_key_set' => !empty(config('app.key')),
+        'db_connection' => config('database.default'),
+        'sqlite_exists' => file_exists(database_path('database.sqlite')),
+        'sqlite_writable' => is_writable(database_path('database.sqlite')),
+        'storage_writable' => is_writable(storage_path('framework/sessions')),
+        'properties_count' => \App\Models\Property::count(),
+    ]);
+});
+
 // Vista principal / Landing Page
 Route::inertia('/', 'welcome', [
     'canRegister' => Features::enabled(Features::registration()),
