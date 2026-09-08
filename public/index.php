@@ -19,10 +19,9 @@ try {
     $app = require_once __DIR__.'/../bootstrap/app.php';
     $app->handleRequest(Request::capture());
 } catch (\Throwable $e) {
+    error_log((string) $e);
     http_response_code(500);
     header('Content-Type: text/plain');
-    echo "Uncaught Exception: " . $e->getMessage() . "\n\n";
-    echo "File: " . $e->getFile() . ":" . $e->getLine() . "\n\n";
-    echo "Trace:\n" . $e->getTraceAsString();
+    echo "Error del servidor. Por favor, intenta de nuevo más tarde.";
     exit(1);
 }
