@@ -47,10 +47,10 @@ php artisan migrate --force || echo "Warning: Migrations could not run immediate
 echo "Seeding initial properties and users..."
 php artisan db:seed --force || echo "Warning: Seeder could not run immediately."
 
-# Clear and optimize configuration cache
-php artisan config:cache || true
-php artisan route:cache || true
-php artisan view:cache || true
+# Clear configuration, route and view cache so runtime env vars are read dynamically
+php artisan config:clear || true
+php artisan route:clear || true
+php artisan view:clear || true
 
 # Start PHP-FPM in background
 echo "Starting PHP-FPM..."
