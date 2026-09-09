@@ -25,10 +25,12 @@ import {
   Download,
   FileSpreadsheet,
   Calendar,
-  Mail
+  Mail,
+  GraduationCap
 } from 'lucide-react';
 import Logo from './Logo';
 import PropertyFormModal from './PropertyFormModal';
+import OnboardingModal from './OnboardingModal';
 
 export default function DashboardVendedor({ 
   user, 
@@ -48,6 +50,14 @@ export default function DashboardVendedor({
 
   const [editingProperty, setEditingProperty] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+
+  useEffect(() => {
+    const seen = localStorage.getItem('renacer_onboarding_seen_vendedor');
+    if (!seen) {
+      setIsOnboardingOpen(true);
+    }
+  }, []);
 
   const [editingLeadNote, setEditingLeadNote] = useState(null);
   const [leadNoteText, setLeadNoteText] = useState('');
@@ -272,6 +282,16 @@ export default function DashboardVendedor({
 
             {/* Acciones */}
             <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsOnboardingOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-[#D4AF37] bg-[#141416] hover:bg-[#1F1F24] border border-[#D4AF37]/30 hover:border-[#D4AF37] transition-all cursor-pointer shadow-xs"
+                title="Abrir Centro de Capacitación y Playbook de Ventas"
+              >
+                <GraduationCap className="w-4 h-4 text-[#D4AF37]" />
+                <span>Capacitación</span>
+              </button>
+
               <a
                 href="/"
                 className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#141416] hover:bg-[#1A1A1A] text-slate-300 border border-white/10 transition-colors"
@@ -815,6 +835,14 @@ export default function DashboardVendedor({
         property={editingProperty}
         onSaved={handlePropertySaved}
         isAdmin={false}
+      />
+
+      {/* MODAL DE INDUCCIÓN Y CAPACITACIÓN */}
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        role="vendedor"
+        userName={user?.name || 'Asesor'}
       />
 
     </div>

@@ -37,10 +37,12 @@ import {
   Trophy,
   Target,
   BarChart3,
-  Check
+  Check,
+  GraduationCap
 } from 'lucide-react';
 import Logo from './Logo';
 import PropertyFormModal from './PropertyFormModal';
+import OnboardingModal from './OnboardingModal';
 
 export default function DashboardAdmin({ 
   user, 
@@ -72,7 +74,15 @@ export default function DashboardAdmin({
   // Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAdvisorModalOpen, setIsAdvisorModalOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
+
+  useEffect(() => {
+    const seen = localStorage.getItem('renacer_onboarding_seen_admin');
+    if (!seen) {
+      setIsOnboardingOpen(true);
+    }
+  }, []);
   const [loadingAction, setLoadingAction] = useState(false);
 
   // Form state de asesor
@@ -435,6 +445,16 @@ export default function DashboardAdmin({
 
             {/* Acciones Topbar */}
             <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsOnboardingOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-[#D4AF37] bg-[#141416] hover:bg-[#1F1F24] border border-[#D4AF37]/30 hover:border-[#D4AF37] transition-all cursor-pointer shadow-xs"
+                title="Abrir Centro de Capacitación y Manual Operativo"
+              >
+                <GraduationCap className="w-4 h-4 text-[#D4AF37]" />
+                <span>Capacitación</span>
+              </button>
+
               <a
                 href="/"
                 className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#141416] hover:bg-[#1A1A1A] text-slate-300 border border-white/10 transition-colors"
@@ -1471,6 +1491,14 @@ export default function DashboardAdmin({
         property={editingProperty}
         onSaved={handlePropertySaved}
         isAdmin={true}
+      />
+
+      {/* MODAL DE INDUCCIÓN Y CAPACITACIÓN */}
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        role="admin"
+        userName="Jorge"
       />
 
     </div>
