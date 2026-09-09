@@ -10,6 +10,8 @@ import {
   Heart, 
   Eye, 
   Share2,
+  Scale,
+  Map,
   Sparkles 
 } from 'lucide-react';
 
@@ -17,6 +19,8 @@ export default function PropertyCard({
   property, 
   isFavorite = false, 
   onToggleFavorite, 
+  isCompared = false,
+  onToggleCompare,
   onOpenLogin,
   onOpenDetail,
   onOpenWhatsApp,
@@ -104,6 +108,21 @@ export default function PropertyCard({
     }
   };
 
+  const handleCompareClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onToggleCompare) {
+      onToggleCompare(property);
+    }
+  };
+
+  const handleMapsClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const query = encodeURIComponent(`${ubicacion}, ${ciudad || 'Chihuahua'}`);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div 
       onClick={handleCardClick}
@@ -122,7 +141,7 @@ export default function PropertyCard({
         {/* Gradiente de sombra */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#141416] via-transparent to-black/30 opacity-90 pointer-events-none" />
 
-        {/* Badges de Operación y Estatus */}
+        {/* Badges de Operación y Comparador */}
         <div className="absolute top-3.5 left-3.5 z-10 flex items-center gap-2">
           <span
             className="inline-flex items-center px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-black/85 border border-[#D4AF37]/40 text-[#D4AF37] shadow-lg backdrop-blur-md"
@@ -130,16 +149,34 @@ export default function PropertyCard({
             {tipo}
           </span>
 
-          {estatus && estatus !== 'Activo' && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-[#202024] text-slate-300 border border-white/10 backdrop-blur-md">
-              {estatus}
-            </span>
-          )}
+          <button
+            type="button"
+            onClick={handleCompareClick}
+            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all shadow-lg backdrop-blur-md cursor-pointer border ${
+              isCompared
+                ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                : 'bg-black/75 text-slate-300 hover:text-white border-white/10 hover:border-[#D4AF37]/50'
+            }`}
+            title={isCompared ? 'Seleccionada para comparar' : 'Agregar a comparador'}
+          >
+            <Scale className="w-3 h-3" />
+            <span className="hidden sm:inline">{isCompared ? 'Comparando' : 'Comparar'}</span>
+          </button>
         </div>
 
-        {/* Acciones Top-Right: Compartir y Favorito */}
+        {/* Acciones Top-Right: Maps, Compartir y Favorito */}
         <div className="absolute top-3.5 right-3.5 z-20 flex items-center gap-2">
           
+          {/* Botón Google Maps */}
+          <button
+            type="button"
+            onClick={handleMapsClick}
+            className="p-2.5 rounded-full bg-black/75 hover:bg-black text-slate-300 hover:text-[#D4AF37] backdrop-blur-md transition-all cursor-pointer shadow-md hover:scale-110 border border-white/10 hover:border-[#D4AF37]/40"
+            title="Ver ubicación en Google Maps"
+          >
+            <Map className="w-3.5 h-3.5" />
+          </button>
+
           {/* Botón Compartir */}
           <button
             type="button"

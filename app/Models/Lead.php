@@ -14,8 +14,12 @@ class Lead extends Model
         'user_id',
         'cliente_nombre',
         'cliente_telefono',
+        'cliente_email',
         'origen',
         'estatus',
+        'fecha_visita',
+        'turno_visita',
+        'canal_utm',
         'notas',
     ];
 

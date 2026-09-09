@@ -3,6 +3,7 @@ import Navbar from './Navbar';
 import HeroFilter from './HeroFilter';
 import PropertyCard from './PropertyCard';
 import PropertyDetail from './PropertyDetail';
+import PropertyComparator from './PropertyComparator';
 import LeadCaptureModal from './LeadCaptureModal';
 import ShareModal from './ShareModal';
 import FavoritesDrawer from './FavoritesDrawer';
@@ -10,7 +11,7 @@ import LoginModal from './LoginModal';
 import ContactSection from './ContactSection';
 import Footer from './Footer';
 import { mockProperties } from '../data/mockProperties';
-import { Building, ShieldCheck, Users, Award, SearchX, ArrowRight, CheckCircle2, Heart, Sparkles } from 'lucide-react';
+import { Building, ShieldCheck, Users, Award, SearchX, ArrowRight, CheckCircle2, Heart, Sparkles, Scale, Trash2 } from 'lucide-react';
 
 export default function Home({ authUser }) {
   const [propertiesList, setPropertiesList] = useState(mockProperties);
@@ -24,12 +25,15 @@ export default function Home({ authUser }) {
   const [minBanos, setMinBanos] = useState(0);
 
   const [favoriteIds, setFavoriteIds] = useState([]);
+  const [comparedProperties, setComparedProperties] = useState([]);
   
   // Modales
   const [isFavoritesDrawerOpen, setIsFavoritesDrawerOpen] = useState(false);
+  const [isComparatorOpen, setIsComparatorOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [selectedPropertyDetail, setSelectedPropertyDetail] = useState(null);
   const [leadCaptureProperty, setLeadCaptureProperty] = useState(null);
+  const [leadCaptureMode, setLeadCaptureMode] = useState('info'); // 'info' | 'visita'
   const [shareProperty, setShareProperty] = useState(null);
 
   useEffect(() => {
@@ -97,6 +101,32 @@ export default function Home({ authUser }) {
     }
   };
 
+  const handleToggleCompare = (property) => {
+    const isAlready = comparedProperties.some(p => p.id === property.id);
+    if (isAlready) {
+      setComparedProperties(comparedProperties.filter(p => p.id !== property.id));
+    } else {
+      if (comparedProperties.length >= 3) {
+        alert('Puedes comparar un máximo de 3 propiedades a la vez.');
+        return;
+      }
+      setComparedProperties([...comparedProperties, property]);
+    }
+  };
+
+  const handleRemoveFromCompare = (propId) => {
+    setComparedProperties(comparedProperties.filter(p => p.id !== propId));
+  };
+
+  const handleClearCompare = () => {
+    setComparedProperties([]);
+  };
+
+  const handleScheduleVisit = (property) => {
+    setLeadCaptureMode('visita');
+    setLeadCaptureProperty(property);
+  };
+
   const handleWhatsAppContact = (property) => {
     if (authUser) {
       fetch('/api/leads', {
@@ -124,6 +154,7 @@ export default function Home({ authUser }) {
       const msg = `Hola, me interesa información sobre la propiedad: ${property.titulo} - Ubicada en ${property.ciudad || property.ubicacion}`;
       window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
     } else {
+      setLeadCaptureMode('info');
       setLeadCaptureProperty(property);
     }
   };
@@ -293,6 +324,8 @@ export default function Home({ authUser }) {
                 property={property} 
                 isFavorite={favoriteIds.includes(property.id)}
                 onToggleFavorite={handleToggleFavorite}
+                isCompared={comparedProperties.some(cp => cp.id === property.id)}
+                onToggleCompare={handleToggleCompare}
                 onOpenLogin={() => setIsLoginModalOpen(true)}
                 onOpenDetail={(prop) => setSelectedPropertyDetail(prop)}
                 onOpenWhatsApp={handleWhatsAppContact}
@@ -321,6 +354,59 @@ export default function Home({ authUser }) {
         )}
 
       </main>
+
+      {/* Barra Flotante de Comparador (cuando hay propiedades seleccionadas) */}
+      {comparedProperties.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-2xl bg-[#141416]/95 border border-[#D4AF37]/50 shadow-2xl shadow-black rounded-2xl p-3 sm:p-4 backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300 flex items-center justify-between gap-3 text-white">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 shrink-0">
+              <Scale className="w-5 h-5" />
+            </div>
+            <div className="hidden sm:block">
+              <span className="block text-xs font-bold text-white">
+                Comparando {comparedProperties.length} {comparedProperties.length === 1 ? 'propiedad' : 'propiedades'}
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Máximo 3 propiedades en simultáneo
+              </span>
+            </div>
+
+            {/* Mini miniaturas */}
+            <div className="flex items-center -space-x-2 overflow-hidden">
+              {comparedProperties.map(p => (
+                <img 
+                  key={p.id}
+                  src={p.imagen} 
+                  alt={p.titulo} 
+                  className="w-9 h-9 rounded-full object-cover border-2 border-[#141416]" 
+                  title={p.titulo}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleClearCompare}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+              title="Limpiar"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsComparatorOpen(true)}
+              style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
+              className="px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:brightness-95 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Scale className="w-3.5 h-3.5" />
+              <span>Ver Comparativa</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 5. Sección Nosotros */}
       <section id="nosotros" className="bg-[#000000] py-16 md:py-24 border-t border-[#D4AF37]/20">
@@ -391,9 +477,23 @@ export default function Home({ authUser }) {
         onClose={() => setSelectedPropertyDetail(null)}
         isFavorite={selectedPropertyDetail ? favoriteIds.includes(selectedPropertyDetail.id) : false}
         onToggleFavorite={handleToggleFavorite}
+        isCompared={selectedPropertyDetail ? comparedProperties.some(cp => cp.id === selectedPropertyDetail.id) : false}
+        onToggleCompare={handleToggleCompare}
+        onScheduleVisit={handleScheduleVisit}
         onOpenWhatsApp={handleWhatsAppContact}
         onShare={(prop) => setShareProperty(prop)}
         authUser={authUser}
+      />
+
+      {/* MODAL COMPARADOR DE PROPIEDADES */}
+      <PropertyComparator
+        isOpen={isComparatorOpen}
+        onClose={() => setIsComparatorOpen(false)}
+        properties={comparedProperties}
+        onRemoveProperty={handleRemoveFromCompare}
+        onClearAll={handleClearCompare}
+        onOpenWhatsApp={handleWhatsAppContact}
+        onOpenDetail={(prop) => setSelectedPropertyDetail(prop)}
       />
 
       {/* MODAL COMPARTIR EN REDES SOCIALES */}
@@ -403,12 +503,13 @@ export default function Home({ authUser }) {
         onClose={() => setShareProperty(null)}
       />
 
-      {/* MODAL CAPTURA RÁPIDA DE LEAD */}
+      {/* MODAL CAPTURA RÁPIDA / AGENDADOR DE VISITA */}
       <LeadCaptureModal
         property={leadCaptureProperty}
         isOpen={!!leadCaptureProperty}
         onClose={() => setLeadCaptureProperty(null)}
         authUser={authUser}
+        initialMode={leadCaptureMode}
       />
 
       {/* Drawer de Favoritos */}

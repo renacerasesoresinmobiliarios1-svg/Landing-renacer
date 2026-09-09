@@ -21,7 +21,11 @@ import {
   FileText,
   Save,
   Loader2,
-  Sparkles
+  Sparkles,
+  Download,
+  FileSpreadsheet,
+  Calendar,
+  Mail
 } from 'lucide-react';
 import Logo from './Logo';
 import PropertyFormModal from './PropertyFormModal';
@@ -38,12 +42,53 @@ export default function DashboardVendedor({
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
+  const [leadSearchTerm, setLeadSearchTerm] = useState('');
+  const [leadStatusFilter, setLeadStatusFilter] = useState('Todos');
+  const [leadPeriodFilter, setLeadPeriodFilter] = useState('todos');
+
   const [editingProperty, setEditingProperty] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [editingLeadNote, setEditingLeadNote] = useState(null);
   const [leadNoteText, setLeadNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+
+  const exportToCSV = (filename, rows) => {
+    const csvContent = '\uFEFF' + rows.map(e => e.map(val => `"${String(val ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportMyLeadsCSV = () => {
+    const headers = [
+      'ID', 'Fecha Registro', 'Nombre Cliente', 'Teléfono', 'Email',
+      'Propiedad', 'Ubicación', 'Estatus', 'Fecha Visita', 'Turno Visita', 'Campaña/UTM', 'Notas'
+    ];
+
+    const rows = filteredMyLeads.map(l => [
+      l.id,
+      l.created_at ? new Date(l.created_at).toLocaleString('es-MX') : '',
+      l.cliente_nombre,
+      l.cliente_telefono,
+      l.cliente_email || '',
+      l.property?.titulo || 'General',
+      l.property?.ciudad || l.property?.ubicacion || '',
+      l.estatus,
+      l.fecha_visita || '',
+      l.turno_visita || '',
+      l.canal_utm || '',
+      l.notas || ''
+    ]);
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    exportToCSV(`mis_prospectos_renacer_${dateStr}.csv`, [headers, ...rows]);
+  };
 
   const loadProperties = () => {
     fetch('/api/properties')
@@ -57,7 +102,15 @@ export default function DashboardVendedor({
   };
 
   const loadMyLeads = () => {
-    fetch('/api/my-leads')
+    let url = '/api/my-leads?';
+    if (leadPeriodFilter && leadPeriodFilter !== 'todos') {
+      url += `periodo=${leadPeriodFilter}&`;
+    }
+    if (leadSearchTerm) {
+      url += `search=${encodeURIComponent(leadSearchTerm)}&`;
+    }
+
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -70,8 +123,11 @@ export default function DashboardVendedor({
 
   useEffect(() => {
     loadProperties();
-    loadMyLeads();
   }, []);
+
+  useEffect(() => {
+    loadMyLeads();
+  }, [leadPeriodFilter, leadSearchTerm]);
 
   const totalActivas = items.filter(p => p.estatus === 'Activo').length;
   const totalEnTrato = items.filter(p => p.estatus === 'En Trato').length;
@@ -87,6 +143,11 @@ export default function DashboardVendedor({
                         p.ciudad?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchStatus = statusFilter === 'Todos' || p.estatus === statusFilter;
     return matchSearch && matchStatus;
+  });
+
+  const filteredMyLeads = myLeads.filter((l) => {
+    const matchStatus = leadStatusFilter === 'Todos' || l.estatus === leadStatusFilter;
+    return matchStatus;
   });
 
   const handleOpenAddModal = () => {
@@ -306,17 +367,31 @@ export default function DashboardVendedor({
             </button>
           </div>
 
-          {activeTab === 'inventario' && (
-            <button
-              onClick={handleOpenAddModal}
-              id="btn-vendedor-add-property"
-              style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg hover:brightness-110 active:brightness-95 transition-all cursor-pointer shrink-0"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>+ Nueva Propiedad</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2.5">
+            {activeTab === 'inventario' && (
+              <button
+                onClick={handleOpenAddModal}
+                id="btn-vendedor-add-property"
+                style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg hover:brightness-110 active:brightness-95 transition-all cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>+ Nueva Propiedad</span>
+              </button>
+            )}
+
+            {activeTab === 'leads' && (
+              <button
+                onClick={handleExportMyLeadsCSV}
+                type="button"
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-200 bg-[#141416] hover:bg-[#1F1F24] border border-white/10 hover:border-[#D4AF37]/50 shadow-md transition-all cursor-pointer shrink-0"
+                title="Descargar mis prospectos en formato Excel/CSV"
+              >
+                <Download className="w-4 h-4 text-[#D4AF37]" />
+                <span>Exportar mis Leads (CSV)</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* PESTAÑA 1: INVENTARIO OPERATIVO */}
@@ -469,17 +544,87 @@ export default function DashboardVendedor({
         {activeTab === 'leads' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             
-            <div className="bg-[#141416] p-6 rounded-2xl border border-[#D4AF37]/20 shadow-xl flex items-center justify-between">
+            <div className="bg-[#141416] p-6 rounded-2xl border border-[#D4AF37]/20 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-[#D4AF37]">
                   Seguimiento de Ventas
                 </span>
                 <h2 className="text-xl font-black text-white tracking-tight mt-0.5">
-                  Mis Prospectos Asignados ({myLeads.length})
+                  Mis Prospectos Asignados ({filteredMyLeads.length})
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">
-                  Atiende a tus prospectos por WhatsApp, actualiza su estatus comercial y registra notas de avance.
+                  Atiende a tus prospectos por WhatsApp, confirma citas de recorrido y registra notas de seguimiento.
                 </p>
+              </div>
+            </div>
+
+            {/* Filtros de Período y Búsqueda */}
+            <div className="bg-[#141416] p-4 rounded-2xl border border-[#D4AF37]/20 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>Filtrar por Fecha:</span>
+                </span>
+                <div className="inline-flex p-1 rounded-xl bg-[#0A0A0A] border border-white/10">
+                  <button
+                    onClick={() => setLeadPeriodFilter('todos')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      leadPeriodFilter === 'todos' ? 'bg-[#D4AF37] text-black shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Histórico
+                  </button>
+                  <button
+                    onClick={() => setLeadPeriodFilter('hoy')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      leadPeriodFilter === 'hoy' ? 'bg-[#D4AF37] text-black shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Hoy
+                  </button>
+                  <button
+                    onClick={() => setLeadPeriodFilter('semana')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      leadPeriodFilter === 'semana' ? 'bg-[#D4AF37] text-black shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Últimos 7 Días
+                  </button>
+                  <button
+                    onClick={() => setLeadPeriodFilter('mes')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      leadPeriodFilter === 'mes' ? 'bg-[#D4AF37] text-black shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Este Mes
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="relative min-w-[220px]">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por cliente o notas..."
+                    value={leadSearchTerm}
+                    onChange={(e) => setLeadSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#0A0A0A] border border-white/10 text-xs font-medium text-white focus:border-[#D4AF37] outline-none"
+                  />
+                </div>
+
+                <select
+                  value={leadStatusFilter}
+                  onChange={(e) => setLeadStatusFilter(e.target.value)}
+                  className="py-2 pl-3 pr-8 rounded-xl bg-[#0A0A0A] border border-white/10 text-xs font-bold text-slate-300 outline-none cursor-pointer focus:border-[#D4AF37]"
+                >
+                  <option value="Todos">Todos los estatus</option>
+                  <option value="Nuevo">Nuevos</option>
+                  <option value="Contactado">Contactados</option>
+                  <option value="Cita Agendada">Citas Agendadas</option>
+                  <option value="Cerrado">Cerrados</option>
+                  <option value="Descartado">Descartados</option>
+                </select>
               </div>
             </div>
 
@@ -489,27 +634,38 @@ export default function DashboardVendedor({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#0A0A0A] text-slate-400 font-bold uppercase tracking-wider border-b border-white/10">
                     <tr>
-                      <th className="py-3.5 px-4">Fecha</th>
+                      <th className="py-3.5 px-4">Fecha / Registro</th>
                       <th className="py-3.5 px-4">Prospecto</th>
                       <th className="py-3.5 px-4">Teléfono</th>
-                      <th className="py-3.5 px-4">Propiedad de Interés</th>
+                      <th className="py-3.5 px-4">Propiedad & Cita</th>
                       <th className="py-3.5 px-4">Estatus Comercial</th>
-                      <th className="py-3.5 px-4">Bitácora / Notas</th>
+                      <th className="py-3.5 px-4">Canal / Bitácora</th>
                       <th className="py-3.5 px-4 text-right">Acción Rápida</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {myLeads.map((lead) => {
+                    {filteredMyLeads.map((lead) => {
                       const cleanPhone = String(lead.cliente_telefono).replace(/\D/g, '');
                       const propTitle = lead.property?.titulo || 'Inmueble';
+
+                      const waMsg = lead.fecha_visita
+                        ? `Hola ${lead.cliente_nombre}, te saludo de RENACER respecto a tu solicitud de cita para el día ${lead.fecha_visita} (${lead.turno_visita || 'Turno'}) en ${propTitle}. ¿Confirmamos la visita?`
+                        : `Hola ${lead.cliente_nombre}, te saluda tu asesor comercial de RENACER - Grupo Inmobiliario sobre la propiedad ${propTitle}. ¿Te gustaría que coordinemos una visita o llamada?`;
 
                       return (
                         <tr key={lead.id} className="hover:bg-white/5 transition-colors">
                           <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                            {lead.created_at ? new Date(lead.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Reciente'}
+                            <div>{lead.created_at ? new Date(lead.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : 'Reciente'}</div>
+                            <span className="text-[10px] text-slate-600">{lead.created_at ? new Date(lead.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                           </td>
                           <td className="py-3.5 px-4 font-bold text-white">
-                            {lead.cliente_nombre}
+                            <div>{lead.cliente_nombre}</div>
+                            {lead.cliente_email && (
+                              <div className="text-[11px] text-slate-400 font-normal flex items-center gap-1">
+                                <Mail className="w-3 h-3 text-slate-500" />
+                                <span>{lead.cliente_email}</span>
+                              </div>
+                            )}
                           </td>
                           <td className="py-3.5 px-4 text-slate-300 font-medium">
                             {lead.cliente_telefono}
@@ -518,9 +674,16 @@ export default function DashboardVendedor({
                             <span className="font-bold text-white block truncate" title={propTitle}>
                               {propTitle}
                             </span>
-                            <span className="text-[10px] text-slate-400">
-                              {lead.property?.ciudad}
-                            </span>
+                            {lead.fecha_visita ? (
+                              <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-blue-950/60 border border-blue-600/40 text-blue-300 text-[10px] font-bold">
+                                <Calendar className="w-3 h-3" />
+                                <span>Cita: {lead.fecha_visita} ({lead.turno_visita || 'Turno'})</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">
+                                {lead.property?.ciudad || 'Consulta general'}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3.5 px-4">
                             <select
@@ -536,13 +699,18 @@ export default function DashboardVendedor({
                             </select>
                           </td>
                           <td className="py-3.5 px-4 max-w-[220px]">
+                            {lead.canal_utm && (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-black bg-[#202024] text-[#D4AF37] border border-white/5 mb-1">
+                                {lead.canal_utm}
+                              </span>
+                            )}
                             <div className="flex items-center gap-2">
                               <span className="text-slate-300 text-[11px] truncate flex-1" title={lead.notas}>
                                 {lead.notas || 'Sin notas de seguimiento'}
                               </span>
                               <button
                                 onClick={() => handleOpenNoteModal(lead)}
-                                className="p-1 rounded-md text-slate-400 hover:text-[#D4AF37] hover:bg-white/5 shrink-0"
+                                className="p-1 rounded-md text-slate-400 hover:text-[#D4AF37] hover:bg-white/5 shrink-0 cursor-pointer"
                                 title="Editar notas"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
@@ -551,11 +719,11 @@ export default function DashboardVendedor({
                           </td>
                           <td className="py-3.5 px-4 text-right">
                             <a
-                              href={`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(`Hola ${lead.cliente_nombre}, te saluda tu asesor comercial de RENACER - Grupo Inmobiliario sobre la propiedad ${propTitle}. ¿Te gustaría que coordinemos una visita o llamada?`)}`}
+                              href={`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(waMsg)}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-md hover:brightness-110 transition-all"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-md hover:brightness-110 transition-all cursor-pointer"
                             >
                               <MessageCircle className="w-3.5 h-3.5" />
                               <span>WhatsApp</span>

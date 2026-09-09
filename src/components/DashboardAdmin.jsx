@@ -29,7 +29,15 @@ import {
   UserCheck,
   Calendar,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Download,
+  FileSpreadsheet,
+  Link2,
+  Copy,
+  Trophy,
+  Target,
+  BarChart3,
+  Check
 } from 'lucide-react';
 import Logo from './Logo';
 import PropertyFormModal from './PropertyFormModal';
@@ -40,17 +48,27 @@ export default function DashboardAdmin({
   properties = [], 
   onRefresh 
 }) {
-  const [activeTab, setActiveTab] = useState('inventario'); // 'inventario', 'asesores', 'leads'
+  const [activeTab, setActiveTab] = useState('inventario'); // 'inventario', 'asesores', 'leads', 'marketing'
   const [items, setItems] = useState(properties);
   const [advisors, setAdvisors] = useState([]);
   const [leads, setLeads] = useState([]);
   const [leadKpis, setLeadKpis] = useState({ total: 0, nuevos: 0, contactados: 0, citas: 0, cerrados: 0 });
+  const [teamPerformance, setTeamPerformance] = useState([]);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
+  const [leadSearchTerm, setLeadSearchTerm] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('Todos');
   const [leadAdvisorFilter, setLeadAdvisorFilter] = useState('Todos');
+  const [leadPeriodFilter, setLeadPeriodFilter] = useState('todos'); // 'todos', 'hoy', 'semana', 'mes'
   
+  // Marketing UTM Link Generator State
+  const [utmPropertyId, setUtmPropertyId] = useState('');
+  const [utmCanal, setUtmCanal] = useState('Facebook Ads');
+  const [utmCampana, setUtmCampana] = useState('Campana_Inversionistas');
+  const [utmAdvisorPhone, setUtmAdvisorPhone] = useState('526141234567');
+  const [isCopiedUtm, setIsCopiedUtm] = useState(false);
+
   // Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAdvisorModalOpen, setIsAdvisorModalOpen] = useState(false);
@@ -64,6 +82,103 @@ export default function DashboardAdmin({
     telefono: '',
     password: '',
   });
+
+  const exportToCSV = (filename, rows) => {
+    const processRow = (row) => {
+      return row.map(val => {
+        if (val === null || val === undefined) return '""';
+        let str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      }).join(',');
+    };
+
+    const csvContent = '\uFEFF' + rows.map(processRow).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPropertiesCSV = () => {
+    const headers = [
+      'ID', 
+      'Título', 
+      'Ubicación', 
+      'Ciudad', 
+      'Operación', 
+      'Precio MXN', 
+      'Costo Base MXN', 
+      'Utilidad MXN', 
+      'Estatus', 
+      'Recámaras', 
+      'Baños', 
+      'Construcción m2', 
+      'Terreno m2', 
+      'Clics WhatsApp', 
+      'Teléfono Asesor'
+    ];
+
+    const rows = items.map(p => [
+      p.id,
+      p.titulo,
+      p.ubicacion,
+      p.ciudad,
+      p.tipo,
+      p.precio,
+      p.costo_base || 0,
+      p.utilidad || 0,
+      p.estatus || 'Activo',
+      p.recamaras || p.habitaciones || 1,
+      p.banos || 1,
+      p.construccion_m2 || p.superficie || '',
+      p.terreno_m2 || '',
+      p.whatsapp_clicks || 0,
+      p.telefono_asesor || ''
+    ]);
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    exportToCSV(`inventario_renacer_${dateStr}.csv`, [headers, ...rows]);
+  };
+
+  const handleExportLeadsCSV = () => {
+    const headers = [
+      'ID', 
+      'Fecha Registro', 
+      'Nombre Cliente', 
+      'Teléfono WhatsApp', 
+      'Email', 
+      'Propiedad de Interés', 
+      'Asesor Asignado', 
+      'Estatus', 
+      'Fecha Visita Solicitada', 
+      'Turno Visita', 
+      'Origen', 
+      'Canal Campaña', 
+      'Notas'
+    ];
+
+    const rows = leads.map(l => [
+      l.id,
+      l.created_at ? l.created_at.replace('T', ' ').substring(0, 19) : '',
+      l.cliente_nombre,
+      l.cliente_telefono,
+      l.cliente_email || '',
+      l.property?.titulo || 'Inmueble',
+      l.advisor?.name || 'Sin Asignar',
+      l.estatus,
+      l.fecha_visita || '',
+      l.turno_visita || '',
+      l.origen || 'WhatsApp',
+      l.canal_utm || '',
+      l.notas || ''
+    ]);
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    exportToCSV(`prospectos_renacer_${dateStr}.csv`, [headers, ...rows]);
+  };
 
   const loadProperties = () => {
     fetch('/api/properties')
@@ -88,13 +203,24 @@ export default function DashboardAdmin({
   };
 
   const loadLeads = () => {
-    fetch('/api/leads')
+    let url = '/api/leads?';
+    if (leadPeriodFilter && leadPeriodFilter !== 'todos') {
+      url += `periodo=${leadPeriodFilter}&`;
+    }
+    if (leadSearchTerm) {
+      url += `search=${encodeURIComponent(leadSearchTerm)}&`;
+    }
+
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
           setLeads(data.data || []);
           if (data.kpis) {
             setLeadKpis(data.kpis);
+          }
+          if (data.team_performance) {
+            setTeamPerformance(data.team_performance);
           }
         }
       })
@@ -104,8 +230,33 @@ export default function DashboardAdmin({
   useEffect(() => {
     loadProperties();
     loadAdvisors();
-    loadLeads();
   }, []);
+
+  useEffect(() => {
+    loadLeads();
+  }, [leadPeriodFilter, leadSearchTerm]);
+
+  const getGeneratedUtmLink = () => {
+    const selectedProp = items.find(p => String(p.id) === String(utmPropertyId)) || items[0];
+    const phone = utmAdvisorPhone || (selectedProp?.telefono_asesor) || '526141234567';
+    const cleanPhone = String(phone).replace(/\D/g, '');
+    const propTitle = selectedProp ? selectedProp.titulo : 'Inmueble Renacer';
+    const propCity = selectedProp ? (selectedProp.ciudad || selectedProp.ubicacion) : 'Chihuahua';
+
+    const msg = `🏛️ *CONSULTA (${utmCanal.toUpperCase()}) - RENACER*\n\n` +
+      `📌 *Campaña:* ${utmCampana}\n` +
+      `🏡 *Propiedad:* ${propTitle} (${propCity})\n` +
+      `Hola, vi este anuncio en ${utmCanal} y deseo recibir la ficha técnica y disponibilidad.`;
+
+    return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+  };
+
+  const handleCopyUtmLink = () => {
+    const link = getGeneratedUtmLink();
+    navigator.clipboard.writeText(link);
+    setIsCopiedUtm(true);
+    setTimeout(() => setIsCopiedUtm(false), 2000);
+  };
 
   const totalWhatsAppClicks = items.reduce((acc, p) => acc + (p.whatsapp_clicks || 0), 0);
   const totalUtilidad = items.reduce((acc, p) => acc + (Number(p.utilidad) || 0), 0);
@@ -369,31 +520,71 @@ export default function DashboardAdmin({
                 {leads.length}
               </span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('marketing')}
+              id="tab-marketing"
+              style={activeTab === 'marketing' ? { background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' } : {}}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'marketing'
+                  ? 'shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-[#1A1A1A]'
+              }`}
+            >
+              <Link2 className="w-4 h-4" />
+              <span>Generador de Enlaces UTM</span>
+            </button>
           </div>
 
-          {activeTab === 'inventario' && (
-            <button
-              onClick={handleOpenAddModal}
-              id="btn-admin-add-property"
-              style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg hover:brightness-110 active:brightness-95 transition-all cursor-pointer shrink-0"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>+ Nueva Propiedad</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2.5">
+            {activeTab === 'inventario' && (
+              <>
+                <button
+                  onClick={handleExportPropertiesCSV}
+                  type="button"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-200 bg-[#141416] hover:bg-[#1F1F24] border border-white/10 hover:border-[#D4AF37]/50 shadow-md transition-all cursor-pointer shrink-0"
+                  title="Descargar base de datos en formato Excel/CSV"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Exportar Excel</span>
+                </button>
 
-          {activeTab === 'asesores' && (
-            <button
-              onClick={() => setIsAdvisorModalOpen(true)}
-              id="btn-admin-add-advisor"
-              style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg hover:brightness-110 active:brightness-95 transition-all cursor-pointer shrink-0"
-            >
-              <UserPlus className="w-4 h-4 stroke-[2.5]" />
-              <span>+ Nuevo Asesor</span>
-            </button>
-          )}
+                <button
+                  onClick={handleOpenAddModal}
+                  id="btn-admin-add-property"
+                  style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg hover:brightness-110 active:brightness-95 transition-all cursor-pointer shrink-0"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>+ Nueva Propiedad</span>
+                </button>
+              </>
+            )}
+
+            {activeTab === 'leads' && (
+              <button
+                onClick={handleExportLeadsCSV}
+                type="button"
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-200 bg-[#141416] hover:bg-[#1F1F24] border border-white/10 hover:border-[#D4AF37]/50 shadow-md transition-all cursor-pointer shrink-0"
+                title="Descargar prospectos en formato Excel/CSV"
+              >
+                <Download className="w-4 h-4 text-[#D4AF37]" />
+                <span>Exportar Leads (CSV)</span>
+              </button>
+            )}
+
+            {activeTab === 'asesores' && (
+              <button
+                onClick={() => setIsAdvisorModalOpen(true)}
+                id="btn-admin-add-advisor"
+                style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg hover:brightness-110 active:brightness-95 transition-all cursor-pointer shrink-0"
+              >
+                <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                <span>+ Nuevo Asesor</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* PESTAÑA 1: INVENTARIO Y MÉTRICAS */}
@@ -631,8 +822,9 @@ export default function DashboardAdmin({
             {/* Tabla de Asesores */}
             <div className="bg-[#141416] rounded-2xl border border-[#D4AF37]/20 shadow-xl overflow-hidden">
               <div className="p-5 border-b border-white/10 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white">
-                  Asesores Comerciales Activos ({advisors.length})
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Asesores Comerciales Activos ({advisors.length})</span>
                 </h3>
               </div>
 
@@ -691,6 +883,94 @@ export default function DashboardAdmin({
               </div>
             </div>
 
+            {/* TABLA DE RENDIMIENTO COMERCIAL / LEADERBOARD */}
+            <div className="bg-[#141416] rounded-2xl border border-[#D4AF37]/25 shadow-xl overflow-hidden mt-6">
+              <div className="p-5 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#FDE68A] via-[#D4AF37] to-[#996515] text-black flex items-center justify-center font-black">
+                    <Trophy className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">
+                      Rendimiento Comercial y Conversión de Ventas
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Métricas en tiempo real por asesor: asignaciones, visitas concretadas y efectividad de cierre.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#0A0A0A] text-slate-400 font-bold uppercase tracking-wider border-b border-white/10">
+                    <tr>
+                      <th className="py-3.5 px-5">Posición</th>
+                      <th className="py-3.5 px-5">Asesor Comercial</th>
+                      <th className="py-3.5 px-5 text-center">Leads Asignados</th>
+                      <th className="py-3.5 px-5 text-center">Citas Agendadas</th>
+                      <th className="py-3.5 px-5 text-center text-[#D4AF37]">Ventas Cerradas</th>
+                      <th className="py-3.5 px-5 text-right">Tasa de Conversión</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {teamPerformance.length > 0 ? (
+                      teamPerformance.map((item, idx) => (
+                        <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                          <td className="py-4 px-5">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full font-black text-xs ${
+                              idx === 0 ? 'bg-[#D4AF37] text-black shadow-md' :
+                              idx === 1 ? 'bg-slate-300 text-black' :
+                              idx === 2 ? 'bg-amber-700 text-white' : 'bg-[#202024] text-slate-400'
+                            }`}>
+                              {idx + 1}
+                            </span>
+                          </td>
+                          <td className="py-4 px-5 font-bold text-white">
+                            <div className="flex items-center gap-2">
+                              <span>{item.name}</span>
+                              {idx === 0 && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-400/20 text-[#D4AF37] border border-[#D4AF37]/30">
+                                  Top Seller
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-normal">{item.email}</span>
+                          </td>
+                          <td className="py-4 px-5 text-center font-bold text-white">
+                            {item.total_leads}
+                          </td>
+                          <td className="py-4 px-5 text-center font-bold text-blue-400">
+                            {item.citas_count}
+                          </td>
+                          <td className="py-4 px-5 text-center font-black text-[#D4AF37] text-sm">
+                            {item.cerrados_count}
+                          </td>
+                          <td className="py-4 px-5 text-right">
+                            <div className="inline-flex items-center gap-2">
+                              <div className="w-20 bg-[#0A0A0A] rounded-full h-2 overflow-hidden border border-white/10 hidden sm:block">
+                                <div 
+                                  className="bg-gradient-to-r from-[#FDE68A] via-[#D4AF37] to-[#996515] h-full rounded-full" 
+                                  style={{ width: `${Math.min(item.tasa_cierre, 100)}%` }}
+                                />
+                              </div>
+                              <span className="font-black text-[#D4AF37]">{item.tasa_cierre}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-500">
+                          No hay datos de rendimiento registrados aún.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -713,12 +993,67 @@ export default function DashboardAdmin({
                 <span className="text-2xl font-black text-white mt-1 block">{leadKpis.contactados}</span>
               </div>
               <div className="p-4 rounded-2xl bg-[#141416] border border-white/10 shadow-xl">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-300">Citas Agendadas</span>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-400">Citas Agendadas</span>
                 <span className="text-2xl font-black text-white mt-1 block">{leadKpis.citas}</span>
               </div>
               <div className="p-4 rounded-2xl bg-[#0A0A0A] border border-[#D4AF37]/40 text-white shadow-xl col-span-2 sm:col-span-1">
                 <span className="block text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Cerrados</span>
                 <span className="text-2xl font-black text-[#D4AF37] mt-1 block">{leadKpis.cerrados}</span>
+              </div>
+            </div>
+
+            {/* Filtros de Período y Búsqueda */}
+            <div className="bg-[#141416] p-4 rounded-2xl border border-[#D4AF37]/20 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>Filtrar por Fecha:</span>
+                </span>
+                <div className="inline-flex p-1 rounded-xl bg-[#0A0A0A] border border-white/10">
+                  <button
+                    onClick={() => setLeadPeriodFilter('todos')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      leadPeriodFilter === 'todos' ? 'bg-[#D4AF37] text-black shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Histórico
+                  </button>
+                  <button
+                    onClick={() => setLeadPeriodFilter('hoy')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      leadPeriodFilter === 'hoy' ? 'bg-[#D4AF37] text-black shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Hoy
+                  </button>
+                  <button
+                    onClick={() => setLeadPeriodFilter('semana')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      leadPeriodFilter === 'semana' ? 'bg-[#D4AF37] text-black shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Últimos 7 Días
+                  </button>
+                  <button
+                    onClick={() => setLeadPeriodFilter('mes')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      leadPeriodFilter === 'mes' ? 'bg-[#D4AF37] text-black shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Este Mes
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative min-w-[240px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar prospecto por nombre, tel, notas..."
+                  value={leadSearchTerm}
+                  onChange={(e) => setLeadSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#0A0A0A] border border-white/10 text-xs font-medium text-white focus:border-[#D4AF37] outline-none"
+                />
               </div>
             </div>
 
@@ -762,13 +1097,13 @@ export default function DashboardAdmin({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#0A0A0A] text-slate-400 font-bold uppercase tracking-wider border-b border-white/10">
                     <tr>
-                      <th className="py-3.5 px-4">Fecha</th>
+                      <th className="py-3.5 px-4">Fecha / Registro</th>
                       <th className="py-3.5 px-4">Prospecto</th>
                       <th className="py-3.5 px-4">Teléfono / WhatsApp</th>
-                      <th className="py-3.5 px-4">Propiedad de Interés</th>
+                      <th className="py-3.5 px-4">Propiedad & Cita</th>
                       <th className="py-3.5 px-4 text-[#D4AF37]">Asesor Asignado</th>
                       <th className="py-3.5 px-4">Estatus</th>
-                      <th className="py-3.5 px-4">Notas</th>
+                      <th className="py-3.5 px-4">Canal / Notas</th>
                       <th className="py-3.5 px-4 text-right">Contacto</th>
                     </tr>
                   </thead>
@@ -780,10 +1115,17 @@ export default function DashboardAdmin({
                       return (
                         <tr key={lead.id} className="hover:bg-white/5 transition-colors">
                           <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                            {lead.created_at ? new Date(lead.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Reciente'}
+                            <div>{lead.created_at ? new Date(lead.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : 'Reciente'}</div>
+                            <span className="text-[10px] text-slate-600">{lead.created_at ? new Date(lead.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                           </td>
                           <td className="py-3.5 px-4 font-bold text-white">
-                            {lead.cliente_nombre}
+                            <div>{lead.cliente_nombre}</div>
+                            {lead.cliente_email && (
+                              <div className="text-[11px] text-slate-400 font-normal flex items-center gap-1">
+                                <Mail className="w-3 h-3 text-slate-500" />
+                                <span>{lead.cliente_email}</span>
+                              </div>
+                            )}
                           </td>
                           <td className="py-3.5 px-4 text-slate-300 font-medium">
                             {lead.cliente_telefono}
@@ -792,9 +1134,16 @@ export default function DashboardAdmin({
                             <span className="font-semibold text-white block truncate" title={propTitle}>
                               {propTitle}
                             </span>
-                            <span className="text-[10px] text-slate-400">
-                              {lead.property?.ciudad}
-                            </span>
+                            {lead.fecha_visita ? (
+                              <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-blue-950/60 border border-blue-600/40 text-blue-300 text-[10px] font-bold">
+                                <Calendar className="w-3 h-3" />
+                                <span>Cita: {lead.fecha_visita} ({lead.turno_visita || 'Turno'})</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">
+                                {lead.property?.ciudad || 'Consulta general'}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3.5 px-4">
                             <select
@@ -823,8 +1172,15 @@ export default function DashboardAdmin({
                               <option value="Descartado">Descartado</option>
                             </select>
                           </td>
-                          <td className="py-3.5 px-4 text-slate-400 max-w-[180px] truncate text-[11px]" title={lead.notas}>
-                            {lead.notas || '-'}
+                          <td className="py-3.5 px-4 max-w-[180px]">
+                            {lead.canal_utm && (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-black bg-[#202024] text-[#D4AF37] border border-white/5 mb-1">
+                                {lead.canal_utm}
+                              </span>
+                            )}
+                            <div className="text-slate-400 truncate text-[11px]" title={lead.notas}>
+                              {lead.notas || '-'}
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 text-right">
                             <a
@@ -832,7 +1188,7 @@ export default function DashboardAdmin({
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs shadow-md hover:brightness-110 transition-all"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs shadow-md hover:brightness-110 transition-all cursor-pointer"
                             >
                               <MessageCircle className="w-3.5 h-3.5" />
                               <span>WhatsApp</span>
@@ -844,6 +1200,165 @@ export default function DashboardAdmin({
                   </tbody>
                 </table>
               </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* PESTAÑA 4: GENERADOR DE ENLACES MARKETING / UTM */}
+        {activeTab === 'marketing' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            
+            <div className="bg-[#141416] p-6 rounded-2xl border border-[#D4AF37]/20 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#FDE68A] via-[#D4AF37] to-[#996515] text-black flex items-center justify-center font-black">
+                  <Link2 className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-white tracking-tight">
+                    Generador de Enlaces de Campaña (UTM & WhatsApp)
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Crea enlaces rastreables para anuncios en Facebook, Instagram, TikTok o lonas con mensajes predefinidos automáticos.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Formulario de Configuración de UTM */}
+              <div className="bg-[#141416] p-6 rounded-2xl border border-[#D4AF37]/20 shadow-xl space-y-4">
+                <h3 className="text-sm font-bold text-white border-b border-white/10 pb-3 flex items-center gap-2">
+                  <Target className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Configuración de la Campaña</span>
+                </h3>
+
+                {/* Selección de Propiedad */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                    Propiedad a Promocionar
+                  </label>
+                  <select
+                    value={utmPropertyId}
+                    onChange={(e) => setUtmPropertyId(e.target.value)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-[#0A0A0A] border border-white/10 text-xs font-bold text-white outline-none cursor-pointer focus:border-[#D4AF37]"
+                  >
+                    {items.map((prop) => (
+                      <option key={prop.id} value={prop.id}>
+                        {prop.titulo} ({prop.ciudad || prop.ubicacion}) - {formatCurrency(prop.precio)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Selección de Canal / Medio */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Canal de Difusión
+                    </label>
+                    <select
+                      value={utmCanal}
+                      onChange={(e) => setUtmCanal(e.target.value)}
+                      className="w-full py-2.5 px-3 rounded-xl bg-[#0A0A0A] border border-white/10 text-xs font-bold text-white outline-none cursor-pointer focus:border-[#D4AF37]"
+                    >
+                      <option value="Facebook Ads">Facebook Ads</option>
+                      <option value="Instagram Ads">Instagram Ads</option>
+                      <option value="TikTok Ads">TikTok Ads</option>
+                      <option value="Portal Inmobiliario">Portal Inmobiliario</option>
+                      <option value="Lona / Cartelera Exterior">Lona / Cartelera Exterior</option>
+                      <option value="Volante Impreso">Volante Impreso</option>
+                      <option value="WhatsApp Masivo">WhatsApp Masivo</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Nombre de la Campaña
+                    </label>
+                    <input
+                      type="text"
+                      value={utmCampana}
+                      onChange={(e) => setUtmCampana(e.target.value)}
+                      placeholder="Ej: promo_primavera_2026"
+                      className="w-full py-2 px-3 rounded-xl bg-[#0A0A0A] border border-white/10 text-xs text-white outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                {/* Teléfono de Recepción */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                    Teléfono Receptor (Asesor o Central)
+                  </label>
+                  <input
+                    type="text"
+                    value={utmAdvisorPhone}
+                    onChange={(e) => setUtmAdvisorPhone(e.target.value)}
+                    placeholder="526141234567"
+                    className="w-full py-2 px-3 rounded-xl bg-[#0A0A0A] border border-white/10 text-xs text-white outline-none focus:border-[#D4AF37]"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Incluye clave de país (ej. 52 para México).
+                  </p>
+                </div>
+              </div>
+
+              {/* Vista Previa y Copia de Enlace */}
+              <div className="bg-[#141416] p-6 rounded-2xl border border-[#D4AF37]/20 shadow-xl flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white border-b border-white/10 pb-3 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                    <span>Vista Previa del Mensaje Rastreable</span>
+                  </h3>
+
+                  <div className="mt-4 p-4 rounded-xl bg-[#0A0A0A] border border-white/10 font-mono text-xs text-emerald-400 whitespace-pre-wrap leading-relaxed">
+                    {`🏛️ *CONSULTA (${utmCanal.toUpperCase()}) - RENACER*\n` +
+                    `📌 *Campaña:* ${utmCampana}\n` +
+                    `🏡 *Propiedad:* ${items.find(p => String(p.id) === String(utmPropertyId))?.titulo || 'Inmueble'} (${items.find(p => String(p.id) === String(utmPropertyId))?.ciudad || 'Chihuahua'})\n\n` +
+                    `Hola, vi este anuncio en ${utmCanal} y deseo recibir la ficha técnica y disponibilidad.`}
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="p-3 rounded-xl bg-[#0A0A0A] border border-[#D4AF37]/30 text-xs text-slate-300 truncate font-mono">
+                    {getGeneratedUtmLink()}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCopyUtmLink}
+                      style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
+                      className="flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg hover:brightness-110 active:brightness-95 transition-all cursor-pointer"
+                    >
+                      {isCopiedUtm ? (
+                        <>
+                          <Check className="w-4 h-4 stroke-[3]" />
+                          <span>¡Enlace Copiado al Portapapeles!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4 stroke-[2.5]" />
+                          <span>Copiar Enlace para Anuncio</span>
+                        </>
+                      )}
+                    </button>
+
+                    <a
+                      href={getGeneratedUtmLink()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-3 px-4 rounded-xl text-xs font-bold text-slate-300 bg-[#202024] hover:bg-[#2A2A30] border border-white/10 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Probar</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
           </div>

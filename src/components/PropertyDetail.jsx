@@ -15,7 +15,11 @@ import {
   Share2, 
   Building2,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Map,
+  Printer,
+  Calendar,
+  Scale
 } from 'lucide-react';
 
 export default function PropertyDetail({
@@ -24,7 +28,10 @@ export default function PropertyDetail({
   onClose,
   isFavorite = false,
   onToggleFavorite,
+  isCompared = false,
+  onToggleCompare,
   onOpenWhatsApp,
+  onScheduleVisit,
   onShare,
   authUser
 }) {
@@ -84,15 +91,60 @@ export default function PropertyDetail({
     }
   };
 
+  const handlePrintPDF = () => {
+    window.print();
+  };
+
+  const handleMapsClick = () => {
+    const query = encodeURIComponent(`${ubicacion}, ${ciudad || 'Chihuahua'}`);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank', 'noopener,noreferrer');
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto print:bg-white print:p-0 print:static">
       <div 
-        className="relative w-full max-w-4xl bg-[#141416] border border-[#D4AF37]/35 rounded-2xl sm:rounded-3xl shadow-2xl shadow-black overflow-hidden my-auto max-h-[92vh] flex flex-col text-white"
+        className="relative w-full max-w-4xl bg-[#141416] border border-[#D4AF37]/35 rounded-2xl sm:rounded-3xl shadow-2xl shadow-black overflow-hidden my-auto max-h-[92vh] flex flex-col text-white print:max-h-none print:shadow-none print:border-none print:bg-white print:text-black"
         onClick={(e) => e.stopPropagation()}
       >
         
-        {/* Barra Superior Flotante de Acciones */}
-        <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+        {/* Barra Superior Flotante de Acciones (Oculta en impresión) */}
+        <div className="absolute top-4 right-4 z-30 flex items-center gap-2 print:hidden">
+          {/* Botón Comparar */}
+          {onToggleCompare && (
+            <button
+              type="button"
+              onClick={() => onToggleCompare(property)}
+              className={`p-2.5 rounded-full border backdrop-blur-md shadow-lg transition-all cursor-pointer ${
+                isCompared
+                  ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                  : 'bg-black/80 text-slate-300 hover:text-[#D4AF37] border-white/10 hover:border-[#D4AF37]/50'
+              }`}
+              title={isCompared ? 'Quitar de Comparador' : 'Agregar a Comparador'}
+            >
+              <Scale className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Botón Google Maps */}
+          <button
+            type="button"
+            onClick={handleMapsClick}
+            className="p-2.5 rounded-full bg-black/80 hover:bg-black text-slate-300 hover:text-[#D4AF37] border border-white/10 hover:border-[#D4AF37]/50 backdrop-blur-md shadow-lg transition-all cursor-pointer"
+            title="Ver ubicación en Google Maps"
+          >
+            <Map className="w-4 h-4" />
+          </button>
+
+          {/* Botón Imprimir / PDF */}
+          <button
+            type="button"
+            onClick={handlePrintPDF}
+            className="p-2.5 rounded-full bg-black/80 hover:bg-black text-slate-300 hover:text-[#D4AF37] border border-white/10 hover:border-[#D4AF37]/50 backdrop-blur-md shadow-lg transition-all cursor-pointer"
+            title="Imprimir / Descargar Ficha Técnica PDF"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
+
           {/* Botón Compartir */}
           <button
             type="button"
@@ -288,22 +340,38 @@ export default function PropertyDetail({
 
         </div>
 
-        {/* 6. Barra Inferior Fija de Contacto WhatsApp */}
-        <div className="p-4 sm:p-6 bg-[#0D0D0D] border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* 6. Barra Inferior Fija de Contacto y Agendador (Oculta en impresión) */}
+        <div className="p-4 sm:p-6 bg-[#0D0D0D] border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
           <div>
-            <span className="block text-[11px] font-bold text-slate-400">¿Deseas agendar un recorrido o recibir la ficha técnica?</span>
-            <span className="text-sm font-black text-[#D4AF37]">Atención directa con nuestro asesor asignado</span>
+            <span className="block text-[11px] font-bold text-slate-400">¿Deseas agendar un recorrido privado o consultar detalles?</span>
+            <span className="text-sm font-black text-[#D4AF37]">Asesoría personalizada y certeza patrimonial</span>
           </div>
 
-          <button
-            type="button"
-            onClick={handleWhatsApp}
-            style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-3.5 px-8 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:brightness-95 transition-all cursor-pointer transform hover:-translate-y-0.5"
-          >
-            <MessageCircle className="w-4 h-4 fill-black/20" />
-            <span>Contactar Asesor vía WhatsApp</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+            {onScheduleVisit && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onScheduleVisit(property);
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl font-bold text-xs uppercase tracking-wider bg-white/10 hover:bg-white/20 text-white border border-white/15 hover:border-[#D4AF37]/50 shadow-md transition-all cursor-pointer"
+              >
+                <Calendar className="w-4 h-4 text-[#D4AF37]" />
+                <span>Agendar Visita</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleWhatsApp}
+              style={{ background: 'linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #996515 100%)', color: '#000000' }}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:brightness-95 transition-all cursor-pointer transform hover:-translate-y-0.5"
+            >
+              <MessageCircle className="w-4 h-4 fill-black/20" />
+              <span>Contactar WhatsApp</span>
+            </button>
+          </div>
         </div>
 
       </div>
